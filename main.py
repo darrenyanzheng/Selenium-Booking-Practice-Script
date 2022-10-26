@@ -5,10 +5,13 @@ from selenium.webdriver.remote.webelement import WebElement
 from prettytable import PrettyTable
 import time
 
+
+# try except NoSuchElementException used because Booking.com will generate a completely different webpage with
+# different structure at times, using different HTML elements and selectors while retaining the same webpage layout /
+# look
 class Booking(webdriver.Chrome):
     def __init__(self, driver_path=r"C:\Users\darre\chromedriver.exe"):
         super(Booking, self).__init__(driver_path)
-
 
     def homepage(self):
         self.maximize_window()
@@ -71,6 +74,7 @@ class Booking(webdriver.Chrome):
             increase_adult_button = self.find_element(By.CSS_SELECTOR, 'button[aria-label="Increase number of Adults"]')
             increase_adult_button.click()
 
+        # xpath here when the layout changes and it is not clear which selector to use
         except NoSuchElementException:
             increase_adult_button = self.find_element(By.XPATH,
                                                       '//*[@id="indexsearch"]/div[2]/div/div/div/form/div[1]/div[3]/div/div/div/div/div[1]/div[2]/button[2]')
@@ -142,9 +146,10 @@ class Booking(webdriver.Chrome):
                                               "/html/body/div[1]/div[2]/div/div/div/form/div[1]/div[4]/button/span")
             submit_button.click()
 
-    def stars(self, how_many):
+    def stars(self, stars):
         self.implicitly_wait(7)
-        stars = self.find_element(By.CSS_SELECTOR, f'input[name="class={how_many}"]')
+        stars = self.find_element(By.CSS_SELECTOR, f'input[name="class={stars}"]')
+        # used javascript click instead of webdriver click because the WebDriver can't click on it
         driver.execute_script("arguments[0].click();", stars)
 
     def review_score(self, score):
@@ -157,38 +162,53 @@ class Booking(webdriver.Chrome):
         all_attributes = []
 
         hotel_block = self.find_element(By.ID, "search_results_table")
-        hotels = hotel_block.find_elements(By.CSS_SELECTOR, 'div[class="a826ba81c4 fe821aea6c fa2f36ad22 afd256fc79 d08f526e0d ed11e24d01 ef9845d4b3 da89aeb942"]')
+
+        # hotels is every div with that class which represents each hotel's information
+        hotels = hotel_block.find_elements(By.CSS_SELECTOR,
+                                           'div[class="a826ba81c4 fe821aea6c fa2f36ad22 afd256fc79 d08f526e0d ed11e24d01 ef9845d4b3 da89aeb942"]')
 
         for hotel in hotels:
-            nights_total = hotel.find_element(By.CSS_SELECTOR, 'div[class="d8eab2cf7f dc2c6438ff"]').get_attribute('innerHTML').strip()
-            night = nights_total[0]
+            # finding the average price per night from finding the string that says how many nights
+
             name = hotel.find_element(By.CSS_SELECTOR,
-                                         'div[class="fcab3ed991 a23c043802"]')
+                                      'div[data-testid="title"]')
+
+            # each .strip() is to remove the potential for trailing spaces for the cleaned attribute
             cleaned_name = name.get_attribute('innerHTML').strip()
 
-            price = hotel.find_element(By.CSS_SELECTOR,
-                                         'span[class="fcab3ed991 bd73d13072"]')
+            try:
+                price_container = hotel.find_element(By.CSS_SELECTOR,
+                                           'div[data-testid="price-and-discounted-price"]')
 
-            cleaned_price = price.get_attribute('innerHTML').strip()
+                discount_and_regular_price = price_container.find_elements(By.TAG_NAME, 'span')
 
-            no_dollar_sign_price = cleaned_price[1:].replace(",","")
+                if len(discount_and_regular_price) == 2:
+                    index = 0
+                    cleaned_price = ""
+                    for price in discount_and_regular_price:
+                        if index == 1:
+                            cleaned_price = price.get_attribute('innerHTML').strip()
+                        index += 1
+                else:
+                    cleaned_price = discount_and_regular_price[0].get_attribute('innerHTML').strip()
+            except NoSuchElementException:
+                price_container = hotel.find_element(By.CSS_SELECTOR,
+                                                     'span[data-testid="price-and-discounted-price"]')
 
-            price_per_night = int(no_dollar_sign_price) / int(night)
+                cleaned_price = price_container.get_attribute('innerHTML').strip()
 
-            price_per_night_string = '$' + str(price_per_night)
-
-            rating = hotel.find_element(By.CSS_SELECTOR,
-                                         'div[class="b5cd09854e d10a6220b4"]')
+            rating_container = hotel.find_element(By.CSS_SELECTOR,
+                                        'div[data-testid="review-score"]')
+            rating = rating_container.find_element(By. TAG_NAME, 'div')
             cleaned_rating = rating.get_attribute('innerHTML').strip()
 
-            all_attributes.append([cleaned_name, cleaned_price, cleaned_rating, price_per_night_string])
+            all_attributes.append([cleaned_name, cleaned_price, cleaned_rating])
 
         return all_attributes
 
-
     def display(self):
         time.sleep(2)
-        table = PrettyTable(field_names=["Hotel Name", "Hotel Price", "Hotel Rating", "Price Per Night"])
+        table = PrettyTable(field_names=["Hotel Name", "Hotel Price", "Hotel Rating"])
         table.add_rows(self.get_attributes())
         print(table)
 
@@ -198,12 +218,18 @@ class Booking(webdriver.Chrome):
         driver.execute_script("arguments[0].click();", next_page)
 
     def more_pages(self):
+        # take from the HTML the amount of leftover properties
         amount_of_properties = driver.find_element(By.CSS_SELECTOR, 'div[class="d8f77e681c"]')
         cleaned_amount_of_properties = amount_of_properties.get_attribute('innerHTML').strip()
+
+        # split the string bc on the page it says the location and : amount of properties, and the number is
+        # before the space that separates it from the word 'properties'
         the_number_of_properties = cleaned_amount_of_properties.split(': ')[1].split(' ')[0]
         pages_left = int(the_number_of_properties) - 25
         pages_left_plus_1 = pages_left // 25 + 1
-        print(f'Would you like to see more hotels? {pages_left} left or {pages_left_plus_1} pages more. Type in a number that\'s {pages_left_plus_1} or fewer.')
+        print(
+            f'Would you like to see more hotels? {pages_left} left or {pages_left_plus_1} pages more. Type in a number that\'s {pages_left_plus_1} or fewer.')
+
 
 driver = Booking()
 driver.homepage()
