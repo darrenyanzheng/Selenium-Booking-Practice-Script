@@ -7,28 +7,39 @@ from selenium.webdriver.support.ui import WebDriverWait
 import time
 
 
-    # try except NoSuchElementException used because Booking.com will generate a completely different webpage with
-    # different structure at times, using different HTML elements and selectors while retaining the same webpage layout /
-    # look
+class Results:
+    def __init__(self, webdriver):
+        self._webdriver = webdriver
 
     def stars(self, stars):
-        stars = WebDriverWait(self, 4).until(
+        stars = WebDriverWait(self._webdriver, 4).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, f'input[name="class={stars}"]')))
         # used javascript click instead of webdriver click because the WebDriver can't click on it
-        driver.execute_script("arguments[0].click();", stars)
+        self._webdriver.execute_script("arguments[0].click();", stars)
 
     def review_score(self, score):
-        score = WebDriverWait(self, 4).until(
+        score = WebDriverWait(self._webdriver, 4).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, f'input[value="review_score={score}"]')))
-        driver.execute_script("arguments[0].click();", score)
+        self._webdriver.execute_script("arguments[0].click();", score)
 
     def get_attributes(self):
+
+
+
         all_attributes = []
-        hotel_block = self.find_element(By.ID, "search_results_table")
+        hotel_block = WebDriverWait(self._webdriver, 2).until(
+            EC.presence_of_element_located((By.ID, "search_results_table")))
 
         # hotels is every div with that class which represents each hotel's information
         hotels = hotel_block.find_elements(By.CSS_SELECTOR,
                                            'div[data-testid="property-card"]')
+
+        WebDriverWait(self._webdriver, 2).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR,
+                                            'div[data-testid="title"]')))
+        WebDriverWait(self._webdriver, 2).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR,
+                                            'div[data-testid="review-score"]')))
         for hotel in hotels:
             # finding the average price per night from finding the string that says how many nights
 
@@ -39,6 +50,7 @@ import time
             cleaned_name = name.get_attribute('innerHTML').strip()
 
             try:
+
                 price_container = hotel.find_element(By.CSS_SELECTOR,
                                                      'div[data-testid="price-and-discounted-price"]')
 
@@ -54,10 +66,12 @@ import time
                 else:
                     cleaned_price = discount_and_regular_price[0].get_attribute('innerHTML').strip()
             except NoSuchElementException:
+
                 price_container = hotel.find_element(By.CSS_SELECTOR,
                                                      'span[data-testid="price-and-discounted-price"]')
 
                 cleaned_price = price_container.get_attribute('innerHTML').strip()
+
 
             rating_container = hotel.find_element(By.CSS_SELECTOR,
                                                   'div[data-testid="review-score"]')
@@ -65,7 +79,6 @@ import time
             cleaned_rating = rating.get_attribute('innerHTML').strip()
 
             all_attributes.append([cleaned_name, cleaned_price, cleaned_rating])
-
         return all_attributes
 
     def display(self):
@@ -75,12 +88,12 @@ import time
         print(table)
 
     def next_page(self):
-        next_page = driver.find_element(By.CSS_SELECTOR, 'button[aria-label="Next page"]')
-        driver.execute_script("arguments[0].click();", next_page)
+        next_page = self._webdriver.find_element(By.CSS_SELECTOR, 'button[aria-label="Next page"]')
+        self._webdriver.execute_script("arguments[0].click();", next_page)
 
     def more_pages(self):
         # take from the HTML the amount of leftover properties
-        amount_of_properties = driver.find_element(By.CSS_SELECTOR, 'div[class="d8f77e681c"]')
+        amount_of_properties = self._webdriver.find_element(By.CSS_SELECTOR, 'div[class="d8f77e681c"]')
         cleaned_amount_of_properties = amount_of_properties.get_attribute('innerHTML').strip()
 
         # split the string bc on the page it says the location and : amount of properties, and the number is
